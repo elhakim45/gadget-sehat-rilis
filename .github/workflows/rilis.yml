@@ -1,0 +1,44 @@
+name: Terbitkan rilis Gadget Sehat
+
+# Setiap APK baru yang dimasukkan ke folder apk/ otomatis diterbitkan sebagai rilis terbaru.
+# Aplikasi Gadget Sehat di HP pembeli membaca rilis terbaru ini untuk pembaruan otomatis.
+on:
+  push:
+    branches: [main]
+    paths: ['apk/*.apk', 'CATATAN_RILIS.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rilis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cari APK terbaru
+        run: |
+          F=$(ls apk/GadgetSehat-v*.apk | sort -V | tail -1)
+          V=${F#apk/GadgetSehat-v}; V=${V%.apk}
+          echo "F=$F" >> $GITHUB_ENV
+          echo "V=$V" >> $GITHUB_ENV
+          echo "APK: $F (versi $V)"
+
+      - name: Cek apakah sudah terbit
+        id: cek
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${V}" >/dev/null 2>&1; then
+            echo "v${V} sudah terbit."; echo "skip=1" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        if: steps.cek.outputs.skip != '1'
+        with:
+          tag_name: v${{ env.V }}
+          name: Gadget Sehat v${{ env.V }}
+          body_path: CATATAN_RILIS.md
+          make_latest: true
+          files: ${{ env.F }}
